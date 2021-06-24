@@ -21,6 +21,17 @@ interface PostFormState {
     error: string;
 };
 
+interface LikeData {
+    id?: number;
+    user?: string;
+}
+
+interface LikeFormState {
+    privateKey: string;
+    data: LikeData;
+    error: string;
+};
+
 class PostForm extends React.Component<{}, PostFormState> {
     api: Api;
 
@@ -120,6 +131,96 @@ class PostForm extends React.Component<{}, PostFormState> {
     }
 }
 
+class LikeForm extends React.Component<{}, LikeFormState> {
+    api: Api;
+
+    constructor(props: {}) {
+        super(props);
+        this.api = new Api({ rpc, signatureProvider: new JsSignatureProvider([]) });
+        this.state = {
+            privateKey: '5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3',
+            data: {
+                id: 0,
+                user: 'bob'
+            },
+            error: '',
+        };
+    }
+
+    setData(data: LikeData) {
+        this.setState({ data: { ...this.state.data, ...data } });
+    }
+
+    async like() {
+        try {
+            this.api.signatureProvider = new JsSignatureProvider([this.state.privateKey]);
+            const result = await this.api.transact(
+                {
+                    actions: [{
+                        account: 'talk',
+                        name: 'like',
+                        authorization: [{
+                            actor: this.state.data.user,
+                            permission: 'active',
+                        }],
+                        data: this.state.data,
+                    }]
+                }, {
+                    blocksBehind: 3,
+                    expireSeconds: 30,
+                });
+            console.log(result);
+            this.setState({ error: '' });
+        } catch (e) {
+            if (e.json)
+                this.setState({ error: JSON.stringify(e.json, null, 4) });
+            else
+                this.setState({ error: '' + e });
+        }
+    }
+
+    render() {
+        return <div>
+            <table>
+                <tbody>
+                    <tr>
+                        <td>Private Key</td>
+                        <td><input
+                            style={{ width: 500 }}
+                            value={this.state.privateKey}
+                            onChange={e => this.setState({ privateKey: e.target.value })}
+                        /></td>
+                    </tr>
+                    <tr>
+                        <td>User</td>
+                        <td><input
+                            style={{ width: 500 }}
+                            value={this.state.data.user}
+                            onChange={e => this.setData({ user: e.target.value })}
+                        /></td>
+                    </tr>
+                    <tr>
+                        <td>Message ID</td>
+                        <td><input
+                            style={{ width: 500 }}
+                            value={this.state.data.id}
+                            onChange={e => this.setData({ id: +e.target.value })}
+                        /></td>
+                    </tr>
+                </tbody>
+            </table>
+            <br />
+            <button onClick={e => this.like()}>Like</button>
+            {this.state.error && <div>
+                <br />
+                Error:
+                <code><pre>{this.state.error}</pre></code>
+            </div>}
+        </div>;
+    }
+}
+
+
 class Messages extends React.Component<{}, { content: string }> {
     interval: number;
 
@@ -135,13 +236,13 @@ class Messages extends React.Component<{}, { content: string }> {
                     json: true, code: 'talk', scope: '', table: 'message', limit: 1000,
                 });
                 let content =
-                    'id          reply_to      user          content\n' +
+                    'id          reply_to      user          likes       content\n' +
                     '=============================================================\n';
                 for (let row of rows.rows)
                     content +=
                         (row.id + '').padEnd(12) +
                         (row.reply_to + '').padEnd(12) + '  ' +
-                        row.user.padEnd(14) +
+                        row.user.padEnd(14) + (row.likes + '').padEnd(12) +
                         row.content + '\n';
                 this.setState({ content });
             } catch (e) {
@@ -166,6 +267,8 @@ class Messages extends React.Component<{}, { content: string }> {
 ReactDOM.render(
     <div>
         <PostForm />
+        <br />
+        <LikeForm />
         <br />
         Messages:
         <Messages />

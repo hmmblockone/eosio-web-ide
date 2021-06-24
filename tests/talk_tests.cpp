@@ -66,4 +66,92 @@ BOOST_AUTO_TEST_CASE(post) try {
 }
 FC_LOG_AND_RETHROW()
 
+
+BOOST_AUTO_TEST_CASE(like) try {
+    tester t{setup_policy::none};
+
+    // Load contract
+    t.create_account(N(talk));
+    t.set_code(N(talk), read_wasm("talk.wasm"));
+    t.set_abi(N(talk), read_abi("talk.abi").data());
+    t.produce_block();
+
+    // Create users
+    t.create_account(N(john));
+    t.create_account(N(jane));
+
+    t.push_action(
+        N(talk), N(post), N(john),
+        mutable_variant_object //
+        ("id", 1)              //
+        ("reply_to", 0)        //
+        ("user", "john")       //
+        ("content", "post 1")  //
+    );
+    t.push_action(
+        N(talk), N(post), N(jane),
+        mutable_variant_object //
+        ("id", 2)              //
+        ("reply_to", 1)        //
+        ("user", "jane")       //
+        ("content", "post 2")  //
+    );
+
+    // Have each user like each post
+    t.push_action(
+        N(talk), N(like), N(jane),
+        mutable_variant_object //
+        ("id", 1)              //
+        ("user", "jane")       //
+    );
+
+    t.push_action(
+        N(talk), N(like), N(jane),
+        mutable_variant_object //
+        ("id", 2)              //
+        ("user", "jane")       //
+    );
+
+    t.push_action(
+        N(talk), N(like), N(john),
+        mutable_variant_object //
+        ("id", 1)              //
+        ("user", "john")       //
+    );
+
+    t.push_action(
+        N(talk), N(like), N(john),
+        mutable_variant_object //
+        ("id", 2)              //
+        ("user", "john")       //
+    );
+
+    // Try to like a message a second time
+    BOOST_CHECK_THROW(
+        [&] {
+            t.push_action(
+                N(talk), N(like), N(john),
+                mutable_variant_object       //
+                ("id", 1)                    //
+                ("user", "john")             //
+            );
+        }(),
+        fc::exception
+    );
+    
+    // Try to like a message a that doesn't exist.
+    BOOST_CHECK_THROW(
+        [&] {
+            t.push_action(
+                N(talk), N(like), N(john),
+                mutable_variant_object       //
+                ("id", 4)                    //
+                ("user", "john")             //
+            );
+        }(),
+        fc::exception
+    );
+}
+FC_LOG_AND_RETHROW()
+
 BOOST_AUTO_TEST_SUITE_END()
